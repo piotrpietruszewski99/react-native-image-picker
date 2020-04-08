@@ -146,10 +146,18 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
         else { // "back"
             self.picker.cameraDevice = UIImagePickerControllerCameraDeviceRear;
         }
+        if (@available(iOS 11.0, *)) {
+          self.picker.imageExportPreset = UIImagePickerControllerImageURLExportPresetCurrent;
+
+        }
 #endif
     }
     else { // RNImagePickerTargetLibrarySingleImage
         self.picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
+        if (@available(iOS 11.0, *)) {
+          self.picker.imageExportPreset = UIImagePickerControllerImageURLExportPresetCurrent;
+
+        }
     }
 
     if ([[self.options objectForKey:@"mediaType"] isEqualToString:@"video"]
@@ -299,7 +307,7 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
             else {
                 originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
             }
-
+            
             if (imageURL) {
                 PHAsset *pickedAsset;
                 if (@available(iOS 11.0, *)) {
@@ -371,28 +379,36 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
                 maxHeight = [[self.options valueForKey:@"maxHeight"] floatValue];
             }
             editedImage = [self downscaleImageIfNecessary:editedImage maxWidth:maxWidth maxHeight:maxHeight];
+            NSURL *fileURL = nil;
+              if (@available(iOS 11.0, *) && [info objectForKey:UIImagePickerControllerImageURL]) {
+                  
+                fileURL = [info objectForKey:UIImagePickerControllerImageURL];
+                [self.response setObject:@"jpeg/jpg" forKey:@"type"];
+                  
+              } else {
+                NSData *data;
+                NSString *mimeType;
+                if ([[self.options objectForKey:@"imageFileType"] isEqualToString:@"png"]) {
+                    data = UIImagePNGRepresentation(editedImage);
+                    mimeType = (__bridge_transfer NSString *)(UTTypeCopyPreferredTagWithClass(kUTTypePNG, kUTTagClassMIMEType));
+                }
+                else {
+                    data = UIImageJPEGRepresentation(editedImage, [[self.options valueForKey:@"quality"] floatValue]);
+                    mimeType = (__bridge_transfer NSString *)(UTTypeCopyPreferredTagWithClass(kUTTypeJPEG, kUTTagClassMIMEType));
+                }
+                [self.response setObject:mimeType forKey:@"type"];
+                [data writeToFile:path atomically:YES];
 
-            NSData *data;
-            NSString *mimeType;
-            if ([[self.options objectForKey:@"imageFileType"] isEqualToString:@"png"]) {
-                data = UIImagePNGRepresentation(editedImage);
-                mimeType = (__bridge_transfer NSString *)(UTTypeCopyPreferredTagWithClass(kUTTypePNG, kUTTagClassMIMEType));
-            }
-            else {
-                data = UIImageJPEGRepresentation(editedImage, [[self.options valueForKey:@"quality"] floatValue]);
-                mimeType = (__bridge_transfer NSString *)(UTTypeCopyPreferredTagWithClass(kUTTypeJPEG, kUTTagClassMIMEType));
-            }
-            [self.response setObject:mimeType forKey:@"type"];
-            [data writeToFile:path atomically:YES];
+                if (![[self.options objectForKey:@"noData"] boolValue]) {
+                    NSString *dataString = [data base64EncodedStringWithOptions:0]; // base64 encoded image string
+                    [self.response setObject:dataString forKey:@"data"];
+                }
 
-            if (![[self.options objectForKey:@"noData"] boolValue]) {
-                NSString *dataString = [data base64EncodedStringWithOptions:0]; // base64 encoded image string
-                [self.response setObject:dataString forKey:@"data"];
+                BOOL vertical = (editedImage.size.width < editedImage.size.height) ? YES : NO;
+                [self.response setObject:@(vertical) forKey:@"isVertical"];
+                fileURL = [NSURL fileURLWithPath:path];
             }
-
-            BOOL vertical = (editedImage.size.width < editedImage.size.height) ? YES : NO;
-            [self.response setObject:@(vertical) forKey:@"isVertical"];
-            NSURL *fileURL = [NSURL fileURLWithPath:path];
+            
             NSString *filePath = [fileURL absoluteString];
             [self.response setObject:filePath forKey:@"uri"];
 
