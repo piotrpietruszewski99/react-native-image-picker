@@ -146,6 +146,10 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
         else { // "back"
             self.picker.cameraDevice = UIImagePickerControllerCameraDeviceRear;
         }
+        if (@available(iOS 11.0, *)) {
+          self.picker.imageExportPreset = UIImagePickerControllerImageURLExportPresetCurrent;
+
+        }
 #endif
     }
     else { // RNImagePickerTargetLibrarySingleImage
@@ -376,7 +380,7 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
             }
             editedImage = [self downscaleImageIfNecessary:editedImage maxWidth:maxWidth maxHeight:maxHeight];
             NSURL *fileURL = nil;
-              if (@available(iOS 11.0, *)) {
+              if (@available(iOS 11.0, *) && [info objectForKey:UIImagePickerControllerImageURL]) {
                   
                 fileURL = [info objectForKey:UIImagePickerControllerImageURL];
                 [self.response setObject:@"jpeg/jpg" forKey:@"type"];
